@@ -570,6 +570,57 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
+    test "it accepts seeded Active Record attribute values in CSV imports" do
+      author_of_imported_posts =
+        User.create!(email: "author@example.com", password: "password")
+
+      csv_string = CSV.generate do |csv|
+        csv << %w[title1 content1]
+        csv << %w[title2 content2]
+      end
+
+      assert_difference("Post.count", 2) do
+        ArtVandelay::Import.new(:posts, rollback: true)
+          .csv(
+            csv_string,
+            headers: [:title, :content],
+            context: {user: author_of_imported_posts}
+          )
+      end
+
+      post_1 = Post.find_by!(title: "title1")
+      post_2 = Post.find_by!(title: "title2")
+
+      assert_equal "title1", post_1.title
+      assert_equal author_of_imported_posts, post_1.user
+      assert_equal "title2", post_2.title
+      assert_equal author_of_imported_posts, post_2.user
+    end
+
+    test "it accepts seeded Active Record attribute values in JSON imports" do
+      author_of_imported_posts =
+        User.create!(email: "author@example.com", password: "password")
+
+      json_string = [
+        {"title": "title1", "content": "content1"},
+        {"title": "title2", "content": "content2"}
+      ].to_json
+
+      assert_difference("Post.count", 2) do
+        ArtVandelay::Import
+          .new(:posts)
+          .json(json_string, context: {user: author_of_imported_posts})
+      end
+
+      post_1 = Post.find_by!(title: "title1")
+      post_2 = Post.find_by!(title: "title2")
+
+      assert_equal "title1", post_1.title
+      assert_equal author_of_imported_posts, post_1.user
+      assert_equal "title2", post_2.title
+      assert_equal author_of_imported_posts, post_2.user
+    end
+
     test "it maps CSV headers to Active Record attributes" do
       csv_string = CSV.generate do |csv|
         csv << %w[email_address passcode]

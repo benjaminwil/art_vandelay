@@ -180,30 +180,32 @@ module ArtVandelay
       options = options.symbolize_keys
       headers = options[:headers] || true
       attributes = options[:attributes] || {}
+      context = options[:context] || {}
       rows = build_csv(csv_string, headers)
 
       if rollback
         # TODO: It would be nice to still return a result object during a
         # failure
         active_record.transaction do
-          parse_rows(rows, attributes, raise_on_error: true)
+          parse_rows(rows, attributes, context, raise_on_error: true)
         end
       else
-        parse_rows(rows, attributes)
+        parse_rows(rows, attributes, context)
       end
     end
 
     def json(json_string, **options)
       options = options.symbolize_keys
       attributes = options[:attributes] || {}
+      context = options[:context] || {}
       array = JSON.parse(json_string)
 
       if rollback
         active_record.transaction do
-          parse_json_data(array, attributes, raise_on_error: true)
+          parse_json_data(array, attributes, context, raise_on_error: true)
         end
       else
-        parse_json_data(array, attributes)
+        parse_json_data(array, attributes, context)
       end
     end
 
@@ -235,12 +237,12 @@ module ArtVandelay
       end
     end
 
-    def parse_json_data(array, attributes, **options)
+    def parse_json_data(array, attributes, context, **options)
       raise_on_error = options[:raise_on_error] || false
       result = Result.new(rows_accepted: [], rows_rejected: [])
 
       array.each do |entry|
-        params = build_params(entry, attributes)
+        params = build_params(entry, attributes).merge(context)
         record = active_record.new(params)
 
         if raise_on_error ? record.save! : record.save
@@ -253,13 +255,13 @@ module ArtVandelay
       result
     end
 
-    def parse_rows(rows, attributes, **options)
+    def parse_rows(rows, attributes, context, **options)
       options = options.symbolize_keys
       raise_on_error = options[:raise_on_error] || false
       result = Result.new(rows_accepted: [], rows_rejected: [])
 
       rows.each do |row|
-        params = build_params(row, attributes)
+        params = build_params(row, attributes).merge(context)
         record = active_record.new(params)
 
         if raise_on_error ? record.save! : record.save
