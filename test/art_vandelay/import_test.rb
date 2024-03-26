@@ -110,16 +110,19 @@ class ArtVandelayImportTest < ActiveSupport::TestCase
         .csv(
           csv_string,
           headers: [:title, :content],
-          context: {user: author_of_imported_posts}
+          context: {
+            content: ->(value) { "#{value} (imported)" },
+            user: author_of_imported_posts
+          }
         )
     end
 
     post_1 = Post.find_by!(title: "title1")
     post_2 = Post.find_by!(title: "title2")
 
-    assert_equal "title1", post_1.title
+    assert_equal "content1 (imported)", post_1.content
     assert_equal author_of_imported_posts, post_1.user
-    assert_equal "title2", post_2.title
+    assert_equal "content2 (imported)", post_2.content
     assert_equal author_of_imported_posts, post_2.user
   end
 
@@ -135,15 +138,21 @@ class ArtVandelayImportTest < ActiveSupport::TestCase
     assert_difference("Post.count", 2) do
       ArtVandelay::Import
         .new(:posts)
-        .json(json_string, context: {user: author_of_imported_posts})
+        .json(
+          json_string,
+          context: {
+            title: ->(value) { "#{value} (imported)" },
+            user: author_of_imported_posts
+          }
+        )
     end
 
-    post_1 = Post.find_by!(title: "title1")
-    post_2 = Post.find_by!(title: "title2")
+    post_1 = Post.find_by!(title: "title1 (imported)")
+    post_2 = Post.find_by!(title: "title2 (imported)")
 
-    assert_equal "title1", post_1.title
+    assert_equal "content1", post_1.content
     assert_equal author_of_imported_posts, post_1.user
-    assert_equal "title2", post_2.title
+    assert_equal "content2", post_2.content
     assert_equal author_of_imported_posts, post_2.user
   end
 

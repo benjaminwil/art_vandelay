@@ -21,7 +21,7 @@ class ArtVandelay::Import
     options = options.symbolize_keys
     headers = options[:headers] || true
     attributes = options[:attributes] || {}
-    context = options[:context] || {}
+    context = (options[:context] || {}).with_indifferent_access
     rows = build_csv(csv_string, headers)
 
     if rollback
@@ -38,7 +38,7 @@ class ArtVandelay::Import
   def json(json_string, **options)
     options = options.symbolize_keys
     attributes = options[:attributes] || {}
-    context = options[:context] || {}
+    context = (options[:context] || {}).with_indifferent_access
     array = JSON.parse(json_string)
 
     if rollback
@@ -83,7 +83,8 @@ class ArtVandelay::Import
     result = Result.new(rows_accepted: [], rows_rejected: [])
 
     array.each do |entry|
-      params = build_params(entry, attributes).merge(context)
+      params = build_params(entry, attributes)
+        .merge(parse_context_for(entry, context))
       record = active_record.new(params)
 
       if raise_on_error ? record.save! : record.save
@@ -102,7 +103,8 @@ class ArtVandelay::Import
     result = Result.new(rows_accepted: [], rows_rejected: [])
 
     rows.each do |row|
-      params = build_params(row, attributes).merge(context)
+      params = build_params(row, attributes)
+      params = params.merge(parse_context_for(params, context))
       record = active_record.new(params)
 
       if raise_on_error ? record.save! : record.save
@@ -113,5 +115,15 @@ class ArtVandelay::Import
     end
 
     result
+  end
+
+  def parse_context_for(entry, context)
+    return context if context.values.none? { _1.is_a? Proc }
+
+    context.to_h { |key, value|
+      next [key, value] unless value.is_a?(Proc)
+
+      [key, value.call(entry[key])]
+    }
   end
 end
