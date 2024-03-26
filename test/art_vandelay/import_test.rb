@@ -58,6 +58,32 @@ class ArtVandelayImportTest < ActiveSupport::TestCase
     assert_equal "s3kure!", user_2.password
   end
 
+  test "it strips not-globally-filtered attributes when filtered attributes are passed" do
+    author_of_imported_posts =
+      User.create!(email: "author@example.com", password: "password")
+
+    csv_string = CSV.generate do |csv|
+      csv << %w[title1 content1]
+      csv << %w[title2 content2]
+    end
+
+    assert_difference("Post.count", 2) do
+      ArtVandelay::Import.new(:posts, filtered_attributes: [:title], rollback: true)
+        .csv(
+          csv_string,
+          headers: [:title, :content],
+          context: {user: author_of_imported_posts}
+        )
+    end
+
+    post_1, post_2 = Post.where(user: author_of_imported_posts)
+
+    assert_equal "content1", post_1.content
+    assert_equal author_of_imported_posts, post_1.user
+    assert_equal "content2", post_2.content
+    assert_equal author_of_imported_posts, post_2.user
+  end
+
   test "it strips whitespace from JSON when strip configuration is passed" do
     json_string = [
       {"email": "  email_1@example.com ", "password": " s3krit "},
